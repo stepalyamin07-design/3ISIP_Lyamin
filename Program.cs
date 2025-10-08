@@ -1,225 +1,145 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
+
+class TextStatistics
+{
+    public string Text { get; set; }
+    public int WordCount { get; set; }
+    public string ShortestWord { get; set; }
+    public string LongestWord { get; set; }
+    public int SentenceCount { get; set; }
+    public int VowelCount { get; set; }
+    public int ConsonantCount { get; set; }
+    public Dictionary<char, int> LetterFrequency { get; set; }
+
+    public TextStatistics()
+    {
+        LetterFrequency = new Dictionary<char, int>();
+    }
+}
 
 class Program
 {
-   
-    class TextStatistics
-    {
-        public int WordCount { get; set; }
-        public string ShortestWord { get; set; }
-        public int SentenceCount { get; set; }
-        public int VowelCount { get; set; }
-        public int ConsonantCount { get; set; }
-        public string LongestWord { get; set; }
-        public Dictionary<char, int> LetterFrequency { get; set; }
-        public string OriginalText { get; set; }
-    }
-
     static void Main()
     {
-        List<TextStatistics> allStatistics = new List<TextStatistics>();
-        bool continueWorking = true;
+        List<TextStatistics> previousStats = new List<TextStatistics>();
 
-        while (continueWorking)
+        while (true)
         {
-            Console.WriteLine("Введите текст (не менее 100 символов):");
-            string text = Console.ReadLine();
+            Console.WriteLine("Введите текст (минимум 100 символов):");
+            string input = Console.ReadLine();
 
-
-            if (text.Length < 100)
+            // Проверяем длину текста, если меньше 100 - просим ввести заново
+            if (input.Length < 100)
             {
-                Console.WriteLine("Текст должен содержать не менее 100 символов!");
+                Console.WriteLine("Текст слишком короткий, попробуйте еще раз.");
                 continue;
             }
 
-            
-            TextStatistics stats = ProcessText(text);
-            allStatistics.Add(stats);
+            TextStatistics stats = AnalyzeText(input);
+            previousStats.Add(stats);
 
-           
+            // Выводим статистику для текущего текста
             PrintStatistics(stats);
 
-          
-            Console.WriteLine("\nХотите ввести новый текст? (да/нет)");
-            string response = Console.ReadLine().ToLower();
-            continueWorking = response == "да";
+            Console.WriteLine("Хотите обработать еще один текст? (да/нет)");
+            string answer = Console.ReadLine();
+            if (answer.ToLower() != "да") break;
         }
 
-      
-        PrintAllStatistics(allStatistics);
+        Console.WriteLine("\nСтатистика по всем введенным текстам:");
+        for (int i = 0; i < previousStats.Count; i++)
+        {
+            Console.WriteLine($"\nТекст #{i + 1}:");
+            PrintStatistics(previousStats[i]);
+        }
     }
 
-    static TextStatistics ProcessText(string text)
+    static TextStatistics AnalyzeText(string text)
     {
-        TextStatistics stats = new TextStatistics
-        {
-            OriginalText = text,
-            LetterFrequency = new Dictionary<char, int>()
-        };
+        TextStatistics stats = new TextStatistics();
+        stats.Text = text;
 
-        char[] wordSeparators = GetWordSeparators();
-        char[] sentenceSeparators = { '.', '!', '?', ';' };
+        // Разбиваем текст на слова по пробелам и знакам препинания
+        char[] separators = new char[] { ' ', '\n', '\r', '\t', ',', '.', '!', '?', ':', ';', '-', '(', ')', '"', '\'' };
+        string[] words = text.Split(separators, StringSplitOptions.RemoveEmptyEntries);
 
-    
-        string[] words = SplitWords(text, wordSeparators);
         stats.WordCount = words.Length;
-        FindShortestAndLongestWord(words, stats);
 
- 
-        stats.SentenceCount = CountSentences(text, sentenceSeparators);
+        // Поиск самого короткого и самого длинного слова
+        string shortest = null;
+        string longest = null;
 
-    
-        CountVowelsAndConsonants(text, stats);
+        foreach (var word in words)
+        {
+            if (shortest == null || word.Length < shortest.Length)
+                shortest = word;
+            if (longest == null || word.Length > longest.Length)
+                longest = word;
+        }
 
- 
-        BuildLetterFrequency(text, stats);
+        stats.ShortestWord = shortest;
+        stats.LongestWord = longest;
+
+        // Подсчёт предложений — считаем по знакам окончания '.', '!', '?' 
+        int sentenceCount = 0;
+        foreach (char c in text)
+        {
+            if (c == '.' || c == '!' || c == '?')
+                sentenceCount++;
+        }
+        stats.SentenceCount = sentenceCount;
+
+        // Подсчёт гласных и согласных
+        string vowels = "аеёиоуыэюяАЕЁИОУЫЭЮЯaeiouAEIOU"; // русские и английские гласные
+        int vowelCount = 0;
+        int consonantCount = 0;
+
+        // Создаем словарь частоты букв
+        Dictionary<char, int> freq = new Dictionary<char, int>();
+
+        foreach (char c in text)
+        {
+            // Определяем букву ли это (русские и английские алфавиты)
+            if ((c >= 'А' && c <= 'я') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == 'ё' || c == 'Ё')
+            {
+                // Подсчёт гласных и согласных
+                if (vowels.IndexOf(c) >= 0)
+                    vowelCount++;
+                else
+                    consonantCount++;
+
+                // Нормализуем букву к нижнему регистру для статистики
+                char lowerChar = Char.ToLower(c);
+
+                if (freq.ContainsKey(lowerChar))
+                    freq[lowerChar]++;
+                else
+                    freq[lowerChar] = 1;
+            }
+        }
+
+        stats.VowelCount = vowelCount;
+        stats.ConsonantCount = consonantCount;
+        stats.LetterFrequency = freq;
 
         return stats;
     }
 
-
-    static char[] GetWordSeparators()
-    {
-        List<char> separators = new List<char>();
-        for (char c = char.MinValue; c < char.MaxValue; c++)
-        {
-            if (char.IsPunctuation(c) || char.IsSeparator(c) || char.IsSymbol(c))
-                separators.Add(c);
-        }
-        return separators.ToArray();
-    }
-
-  
-    static string[] SplitWords(string text, char[] separators)
-    {
-        List<string> words = new List<string>();
-        StringBuilder currentWord = new StringBuilder();
-
-        foreach (char c in text)
-        {
-            if (Array.IndexOf(separators, c) >= 0)
-            {
-                if (currentWord.Length > 0)
-                {
-                    words.Add(currentWord.ToString());
-                    currentWord.Clear();
-                }
-            }
-            else
-            {
-                currentWord.Append(c);
-            }
-        }
-
-
-        if (currentWord.Length > 0)
-            words.Add(currentWord.ToString());
-
-        return words.ToArray();
-    }
-
-
-    static void FindShortestAndLongestWord(string[] words, TextStatistics stats)
-    {
-        if (words.Length == 0) return;
-
-        stats.ShortestWord = words[0];
-        stats.LongestWord = words[0];
-
-        for (int i = 1; i < words.Length; i++)
-        {
-            if (words[i].Length < stats.ShortestWord.Length)
-                stats.ShortestWord = words[i];
-
-            if (words[i].Length > stats.LongestWord.Length)
-                stats.LongestWord = words[i];
-        }
-    }
-
-    static int CountSentences(string text, char[] separators)
-    {
-        int count = 0;
-        bool inSentence = false;
-
-        foreach (char c in text)
-        {
-            if (Array.IndexOf(separators, c) >= 0)
-            {
-                if (inSentence)
-                {
-                    count++;
-                    inSentence = false;
-                }
-            }
-            else if (!char.IsWhiteSpace(c))
-            {
-                inSentence = true;
-            }
-        }
-
-        if (inSentence) count++;
-        return count;
-    }
-
-
-    static void CountVowelsAndConsonants(string text, TextStatistics stats)
-    {
-        string vowels = "aeiouyаеёиоуыэюяAEIOUYАЕЁИОУЫЭЮЯ";
-        string consonants = "bcdfghjklmnpqrstvwxzбвгджзйклмнпрстфхцчшщBCDFGHJKLMNPQRSTVWXZБВГДЖЗЙКЛМНПРСТФХЦЧШЩ";
-
-        foreach (char c in text)
-        {
-            if (vowels.IndexOf(c) >= 0)
-                stats.VowelCount++;
-            else if (consonants.IndexOf(c) >= 0)
-                stats.ConsonantCount++;
-        }
-    }
-
-
-    static void BuildLetterFrequency(string text, TextStatistics stats)
-    {
-        foreach (char c in text)
-        {
-            if (char.IsLetter(c))
-            {
-                char lowerChar = char.ToLower(c);
-                if (stats.LetterFrequency.ContainsKey(lowerChar))
-                    stats.LetterFrequency[lowerChar]++;
-                else
-                    stats.LetterFrequency[lowerChar] = 1;
-            }
-        }
-    }
-
     static void PrintStatistics(TextStatistics stats)
     {
-        Console.WriteLine("\n=== СТАТИСТИКА ТЕКСТА ===");
+        Console.WriteLine("\nСтатистика текста:");
         Console.WriteLine($"Количество слов: {stats.WordCount}");
         Console.WriteLine($"Самое короткое слово: {stats.ShortestWord}");
-        Console.WriteLine($"Количество предложений: {stats.SentenceCount}");
-        Console.WriteLine($"Гласные буквы: {stats.VowelCount}");
-        Console.WriteLine($"Согласные буквы: {stats.ConsonantCount}");
         Console.WriteLine($"Самое длинное слово: {stats.LongestWord}");
-
+        Console.WriteLine($"Количество предложений: {stats.SentenceCount}");
+        Console.WriteLine($"Количество гласных: {stats.VowelCount}");
+        Console.WriteLine($"Количество согласных: {stats.ConsonantCount}");
         Console.WriteLine("Частота букв:");
-        foreach (var entry in stats.LetterFrequency)
-        {
-            Console.WriteLine($"{entry.Key}: {entry.Value}");
-        }
-    }
 
-   
-    static void PrintAllStatistics(List<TextStatistics> allStatistics)
-    {
-        Console.WriteLine("\n=== СТАТИСТИКА ПО ВСЕМ ТЕКСТАМ ===");
-        for (int i = 0; i < allStatistics.Count; i++)
+        foreach (var pair in stats.LetterFrequency)
         {
-            Console.WriteLine($"\n--- Текст #{i + 1} ---");
-            Console.WriteLine($"Первые 50 символов: {allStatistics[i].OriginalText.Substring(0, Math.Min(50, allStatistics[i].OriginalText.Length))}...");
-            PrintStatistics(allStatistics[i]);
+            Console.WriteLine($"  {pair.Key}: {pair.Value}");
         }
     }
 }
